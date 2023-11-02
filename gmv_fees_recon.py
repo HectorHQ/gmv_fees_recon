@@ -159,7 +159,6 @@ if uploaded_files:
     Report_zero_value = dataframes['Report_zero_value']
     revenue_df = dataframes['4500_Revenue_report_Consolidated']
 
-
     retool_df_2023 = dataframes['Retool_2023']
     retool_df_2022 = dataframes['Retool_2022']
     retool_df_2021 = dataframes['Retool_2021']
@@ -188,7 +187,7 @@ if uploaded_files:
     nabis_invoices = nabis_invoices[['Overdue','Delivery Date','Order Number', 'Due', 'Subtotal',
         'Tax','Subtotal Collected', 'Tax Collected','Dispensary','Nabis Overdue Fee Status']] # Selecting only columns needed
 
-    # Working with df's files to standarize format and Data Types 
+    # Working with Aging QBO invoices file to standardize the format and Data Types 
     aging_QBO_df.dropna(subset=['Date'],inplace=True)
     aging_QBO_df['Num'] = aging_QBO_df['Num'].astype('str')
     aging_QBO_df = aging_QBO_df.loc[~aging_QBO_df['Num'].str.contains('-SH')].copy()
@@ -200,12 +199,17 @@ if uploaded_files:
 
     revenue_df['Transaction number'] = revenue_df['Transaction number'].astype('str')
     revenue_df['Invoice'] = revenue_df['Transaction number'].str.replace('([a-z][0-9]|[^\d])','',regex=True)
+    revenue_df = revenue_df.loc[revenue_df['Invoice']!=''].copy()
     revenue_df['Invoice'] = revenue_df['Invoice'].astype('int64')
+    revenue_df['Amount line'] = revenue_df['Amount line'].apply(lambda x: x.replace('$',''))
+    revenue_df['Amount line'] = revenue_df['Amount line'].apply(lambda x: x.replace(',',''))
     revenue_df['Amount line'] = pd.to_numeric(revenue_df['Amount line'])
 
     Report_zero_value['Invoice number'] = Report_zero_value['Invoice number'].astype('str')
     Report_zero_value['Invoice'] = Report_zero_value['Invoice number'].str.replace('([a-z][0-9]|[^\d])','',regex=True)
+    Report_zero_value = Report_zero_value.loc[Report_zero_value['Invoice']!=''].copy()
     Report_zero_value['Invoice'] = Report_zero_value['Invoice'].astype('int64')
+
 
 
     retool_df['Order_tot_amt'] = (retool_df['GMV'] + retool_df['Excise Tax'] - retool_df['Order Credit'] - retool_df['Order Discount'] - retool_df['Order Surcharge'] - retool_df['LineItem Discounts']).round(2)
@@ -219,6 +223,7 @@ if uploaded_files:
     report_zero_value_gpd['Invoice'] = report_zero_value_gpd['Invoice'].astype('int')
     revenue_df_gpd = revenue_df.groupby('Invoice')['Amount line'].sum().reset_index()
     revenue_df_gpd['Invoice'] = revenue_df_gpd['Invoice'].astype('int')
+  
 
 
     # Creating Dictionaries to cross match with Reetool
@@ -227,12 +232,14 @@ if uploaded_files:
     Report_zero_value_dict = dict(zip(report_zero_value_gpd['Invoice'],report_zero_value_gpd['Amount']))
     revenue_df_dict = dict(zip(revenue_df_gpd['Invoice'],revenue_df_gpd['Amount line']))   
 
+    
 
     retool_df['Nabis_Aging_Due'] = retool_df['Order #'].map(nabis_invoices_dict)
     retool_df['QBO_open_balance'] = retool_df['Order #'].map(aging_QBO_dict)
     retool_df['Aging_QBO_Amount'] = retool_df['Order #'].map(aging_QBO_dict)
     retool_df['zero_value_inv'] = retool_df['Order #'].map(Report_zero_value_dict)
     retool_df['Revenue Amt'] = retool_df['Order #'].map(revenue_df_dict)
+    
 
     invoices_in_Qbo = retool_df['QBO_open_balance'].fillna('Not in QBO open Invs')
     retool_df['Nabis_Aging_Due'] = retool_df['Nabis_Aging_Due'].fillna('Not in Nabis Aging')
@@ -265,8 +272,10 @@ if uploaded_files:
                                                 np.where(retool_df_fltr['Variance'] == 0.01, "OK Small Ballance",
                                                         np.where(retool_df_fltr['Variance'] == -0.01, "OK Small Ballance",
                                                                     np.where(retool_df_fltr['Variance'] == retool_df_fltr['Invoice_C_value'], "OK Invoice C not generated yet",
-                                                                             np.where(retool_df['zero_value_inv']==0,"OK,Zero Value Invoice","Review")))))
+                                                                             np.where((retool_df_fltr['Variance']+retool_df_fltr['QBO_Invoce B']) == 0, "OK, 90 days fees. Inv c2 and b open","Review")))))
 
+    retool_df_fltr['Fees_revenue_QBO_comparison'] = np.where(retool_df_fltr['Revenue Amt'].round(2) == retool_df_fltr['Invoice B'].round(2), "OK No Variance","Review")
+    
     retool_df_fltr['Order #'] = retool_df_fltr['Order #'].astype('str')
 
 
