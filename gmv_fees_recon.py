@@ -201,6 +201,7 @@ if uploaded_files:
     revenue_df['Invoice'] = revenue_df['Transaction number'].str.replace('([a-z][0-9]|[^\d])','',regex=True)
     revenue_df = revenue_df.loc[revenue_df['Invoice']!=''].copy()
     revenue_df['Invoice'] = revenue_df['Invoice'].astype('int64')
+    revenue_df['Amount line'] = revenue_df['Amount line'].astype('str')
     revenue_df['Amount line'] = revenue_df['Amount line'].apply(lambda x: x.replace('$',''))
     revenue_df['Amount line'] = revenue_df['Amount line'].apply(lambda x: x.replace(',',''))
     revenue_df['Amount line'] = pd.to_numeric(revenue_df['Amount line'])
